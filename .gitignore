@@ -1,0 +1,6 @@
+# Data files
+data/
+
+# Compiled filed
+__pycache__/
+*.pyc
