@@ -13,3 +13,5 @@ Applying machine learning methods to a lung cancer transcriptome dataset generat
 
 
 Research Paper: Su Bin Lim et al (2018) - A merged lung cancer transcriptome dataset for clinical predictive modelling
+
+Lecturer: Dr Seth Flaxman
