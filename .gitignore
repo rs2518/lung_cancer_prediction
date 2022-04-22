@@ -4,3 +4,6 @@ data/
 # Compiled filed
 __pycache__/
 *.pyc
+
+# Scrap file
+scrap.py
