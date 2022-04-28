@@ -1,7 +1,16 @@
+import os
+
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-from lcml import CLINICAL_INFO_COLS
+from lcml import ROOT
+from lcml import (CLINICAL_INFO_COLS,
+                  HISTOLOGY_MAP,
+                  STAGE_MAP,
+                  SMOKING_MAP)
+from lcml import create_directory
 
 
 # =============================================================================
@@ -116,9 +125,9 @@ clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
 # EXAMINE DATA
 # =============================================================================
 
-# Missing clinical information
-# ----------------------------
-sort="descending"
+# Missing data
+# ------------
+# # sort="descending"
 # na_patient_status = missing_data_prop(patient_status, sort=sort)
 # na_combat_filter = missing_data_prop(combat_filter_expr, sort=sort)
 # na_combat_nofilter = missing_data_prop(combat_nofilter_expr, sort=sort)
@@ -127,11 +136,10 @@ sort="descending"
 # na_tcga_logfc = missing_data_prop(tcga_logfc, sort=sort)
 # na_tcga_expr = missing_data_prop(tcga_expr, sort=sort)
 # na_combined_rank = missing_data_prop(combined_rank, sort=sort)
-na_clinical_info = missing_data_prop(clinical_info, sort=sort)
+na_clinical_info = missing_data_prop(clinical_info)
 # NOTE: Only clinical information contains missing values
 
-
-# Counts by dataset (clinical information)
+# Counts by dataset
 dataset_counts = group_counts(clinical_info, col="Dataset",
                               return_counts=True)
 status_counts = group_counts(clinical_info, col="Disease Status",
@@ -149,6 +157,8 @@ smoking_count = group_counts(clinical_info, col="Smoking",
 # NOTE: Most data points are missing based on the study they were taken from
 
 
+# Checking feature values
+# -----------------------
 # # Scan through non-numeric feature classes
 # stage = clinical_info[~clinical_info["Stage"].isnull()]
 # histology = clinical_info[~clinical_info["Histology"].isnull()]
@@ -161,3 +171,87 @@ smoking_count = group_counts(clinical_info, col="Smoking",
 # Check numeric feature classes
 desc = clinical_info.describe()
 # NOTE: No peculiar values
+
+
+# Preliminary cleaning of data
+# ----------------------------
+df = clinical_info.copy()
+
+# Recode "Stage"
+df["Stage_opt"] = df["Stage"].apply(
+    lambda x: "1B" if x==" pT2N0" else STAGE_MAP[x])
+# Optimistic recoding of "Stage" (pT2N0 --> 1B)
+
+df["Stage_pes"] = df["Stage"].apply(
+    lambda x: "2A" if x==" pT2N0" else STAGE_MAP[x])
+# Pessimistic recoding of "Stage" (pT2N0 --> 2A)
+
+
+# Recode "Smoking"
+df["Smoking_opt"] = df["Smoking"].apply(
+    lambda x: "Never" if x=="Non-smoking" else SMOKING_MAP[x])
+# Optimistic recoding of "Smoking" (non-smoking --> never)
+
+df["Smoking_pes"] = df["Smoking"].apply(
+    lambda x: "Former" if x=="Non-smoking" else SMOKING_MAP[x])
+# Pessimistic recoding of "Smoking" (non-smoking --> former)
+
+
+# Recode "Histology"
+df["Histology"] = df["Histology"].map(HISTOLOGY_MAP)
+
+
+
+# # Remove columns
+# rm = ["Race",
+#       "Recurrence",
+#       "Others",
+#       "TNM stage (T)",
+#       "TNM stage (N)",
+#       "TNM stage (M)"]
+
+
+# =============================================================================
+# EXPLORATORY PLOTS
+# =============================================================================
+
+figpath = os.path.join(ROOT, "figures", "exploratory")
+create_directory(figpath)
+
+
+# Plot age distributions
+# ----------------------
+hues = ["Dataset", "Disease Status", "Gender", "Histology"]
+
+for x, hue in [("Age", hue) for hue in hues]:
+    title = x+" by "+hue.lower()
+    
+    fig, ax = plt.subplots(figsize=(8,8))
+    sns.kdeplot(data=df, x=x, hue=hue, ax=ax)
+    # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
+    ax.set_title(title)
+    fig.tight_layout()
+    
+    name = title.lower().replace(" ", "_")
+    path = os.path.join(figpath, name+".png")
+    fig.savefig(path, bbox_inches="tight")
+    
+
+# "Optimistic" vs. "Pessimistic" estimates
+subhues = ["Stage", "Smoking"]
+for x, hue in [("Age", hue) for hue in subhues]:
+    fig, ax = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(12,8))
+    title = x+" by "+hue.lower()
+    fig.suptitle(title)
+    for i, est in enumerate(["Optimistic", "Pessimistic"]):
+        title = x+" by "+hue.lower()+" ("+est+")"
+        subhue = hue+"_"+est.lower()[0:3]
+        
+        sns.kdeplot(data=df, x=x, hue=subhue, ax=ax[i])
+        # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
+        ax[i].set_title(est)
+        fig.tight_layout()
+    
+        name = x+" by "+subhue
+        path = os.path.join(figpath, name.lower().replace(" ", "_")+".png")
+        fig.savefig(path, bbox_inches="tight")
