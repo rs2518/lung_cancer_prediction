@@ -5,11 +5,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from sklearn.decomposition import PCA
+
 from lcml import ROOT
 from lcml import (CLINICAL_INFO_COLS,
+                  STATUS_MAP,
                   HISTOLOGY_MAP,
                   STAGE_MAP,
-                  SMOKING_MAP)
+                  SMOKING_MAP,
+                  SAMPLE_IDS)
 from lcml import create_directory
 
 
@@ -94,14 +98,14 @@ clinical_info_url = "https://figshare.com/ndownloader/files/10449075"
 
 # Load data
 # ---------
-# patient_status = pd.read_csv(patient_status_url, index_col=0)
-# combat_filter_expr = pd.read_csv(combat_filter_expr_url, sep="\t").T
-# combat_nofilter_expr = pd.read_csv(combat_nofilter_expr_url, sep="\t").T
-# nocombat_nofilter_expr = pd.read_csv(nocombat_nofilter_expr_url, sep="\t").T
-# microarray_logfc = pd.read_csv(microarray_logfc_url, sep="\t")
-# tcga_logfc = pd.read_csv(tcga_logfc_url, sep="\t")
-# tcga_expr = pd.read_csv(tcga_expr_url, sep="\t", index_col=0).T
-# combined_rank = pd.read_csv(combined_rank_url, sep="\t")
+patient_status = pd.read_csv(patient_status_url, index_col=0)
+combat_filter_expr = pd.read_csv(combat_filter_expr_url, sep="\t").T
+combat_nofilter_expr = pd.read_csv(combat_nofilter_expr_url, sep="\t").T
+nocombat_nofilter_expr = pd.read_csv(nocombat_nofilter_expr_url, sep="\t").T
+microarray_logfc = pd.read_csv(microarray_logfc_url, sep="\t")
+tcga_logfc = pd.read_csv(tcga_logfc_url, sep="\t")
+tcga_expr = pd.read_csv(tcga_expr_url, sep="\t", index_col=0).T
+combined_rank = pd.read_csv(combined_rank_url, sep="\t")
 clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
                             header=0, names=CLINICAL_INFO_COLS)
 
@@ -111,14 +115,17 @@ clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
 # SANITY CHECKS
 # =============================================================================
 
-# # Check clinical_info and patient_status records match
-# merge = pd.merge(patient_status, clinical_info,
-#                   how="inner", left_index=True, right_index=True)    
-# print(clinical_info.shape[0] == merge.shape[0])
+# Check clinical_info and patient_status records match
+merge = pd.merge(patient_status, clinical_info,
+                  how="inner", left_index=True, right_index=True)    
+if clinical_info.shape[0] != merge.shape[0]:
+    raise ValueError("Clinical information and patient status "
+                      "records do not match!")
 
-# # Check "Gene" and "Gene.1" columns match in rank table
-# print(all(combined_rank["Gene"]==combined_rank["Gene.1"]))
-
+# Check "Gene" and "Gene.1" columns match in rank table
+if all(combined_rank["Gene"]!=combined_rank["Gene.1"]):
+    raise ValueError("'Gene' does not match 'Gene.1' in rank table!")
+    
 
 
 # =============================================================================
@@ -127,15 +134,15 @@ clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
 
 # Missing data
 # ------------
-# # sort="descending"
-# na_patient_status = missing_data_prop(patient_status, sort=sort)
-# na_combat_filter = missing_data_prop(combat_filter_expr, sort=sort)
-# na_combat_nofilter = missing_data_prop(combat_nofilter_expr, sort=sort)
-# na_nocombat_nofilter = missing_data_prop(nocombat_nofilter_expr, sort=sort)
-# na_microarray_logfc = missing_data_prop(microarray_logfc, sort=sort)
-# na_tcga_logfc = missing_data_prop(tcga_logfc, sort=sort)
-# na_tcga_expr = missing_data_prop(tcga_expr, sort=sort)
-# na_combined_rank = missing_data_prop(combined_rank, sort=sort)
+sort="descending"
+na_patient_status = missing_data_prop(patient_status, sort=sort)
+na_combat_filter = missing_data_prop(combat_filter_expr, sort=sort)
+na_combat_nofilter = missing_data_prop(combat_nofilter_expr, sort=sort)
+na_nocombat_nofilter = missing_data_prop(nocombat_nofilter_expr, sort=sort)
+na_microarray_logfc = missing_data_prop(microarray_logfc, sort=sort)
+na_tcga_logfc = missing_data_prop(tcga_logfc, sort=sort)
+na_tcga_expr = missing_data_prop(tcga_expr, sort=sort)
+na_combined_rank = missing_data_prop(combined_rank, sort=sort)
 na_clinical_info = missing_data_prop(clinical_info)
 # NOTE: Only clinical information contains missing values
 
@@ -154,61 +161,61 @@ surv_counts = group_counts(clinical_info, col="Survival",
                            return_counts=True)
 smoking_count = group_counts(clinical_info, col="Smoking",
                              return_counts=True)
-# NOTE: Most data points are missing based on the study they were taken from
+# NOTE: Most missing clinical data is based on the study they were taken from
 
 
-# Checking feature values
-# -----------------------
+# # Checking feature values
+# # -----------------------
 # # Scan through non-numeric feature classes
 # stage = clinical_info[~clinical_info["Stage"].isnull()]
 # histology = clinical_info[~clinical_info["Histology"].isnull()]
 # surv_month = clinical_info[~clinical_info["Survival Month"].isnull()]
 # smoking = clinical_info[~clinical_info["Smoking"].isnull()]
-# NOTE: "Stage", "Histology" and "Smoking" need to be recoded.
-# "Survival Month" should be removed
+# # NOTE: "Stage", "Histology" and "Smoking" need to be recoded.
+# # "Survival Month" should be removed
 
 
-# Check numeric feature classes
-desc = clinical_info.describe()
-# NOTE: No peculiar values
+# # Inspect numeric features
+# desc = clinical_info.describe()
+# # NOTE: No peculiar values
 
 
 # Preliminary cleaning of data
 # ----------------------------
-df = clinical_info.copy()
+# Recode "Disease Status"
+clinical_info["Disease Status"] = clinical_info["Disease Status"].map(
+    STATUS_MAP)
+# NSCLC/Normal --> Tumour/Non-tumour
 
 # Recode "Stage"
-df["Stage_opt"] = df["Stage"].apply(
+clinical_info["Stage_opt"] = clinical_info["Stage"].apply(
     lambda x: "1B" if x==" pT2N0" else STAGE_MAP[x])
 # Optimistic recoding of "Stage" (pT2N0 --> 1B)
-
-df["Stage_pes"] = df["Stage"].apply(
+clinical_info["Stage_pes"] = clinical_info["Stage"].apply(
     lambda x: "2A" if x==" pT2N0" else STAGE_MAP[x])
 # Pessimistic recoding of "Stage" (pT2N0 --> 2A)
 
-
 # Recode "Smoking"
-df["Smoking_opt"] = df["Smoking"].apply(
+clinical_info["Smoking_opt"] = clinical_info["Smoking"].apply(
     lambda x: "Never" if x=="Non-smoking" else SMOKING_MAP[x])
 # Optimistic recoding of "Smoking" (non-smoking --> never)
-
-df["Smoking_pes"] = df["Smoking"].apply(
+clinical_info["Smoking_pes"] = clinical_info["Smoking"].apply(
     lambda x: "Former" if x=="Non-smoking" else SMOKING_MAP[x])
 # Pessimistic recoding of "Smoking" (non-smoking --> former)
 
-
 # Recode "Histology"
-df["Histology"] = df["Histology"].map(HISTOLOGY_MAP)
+clinical_info["Histology"] = clinical_info["Histology"].map(HISTOLOGY_MAP)
 
+# Remove columns
+rm = ["Race",
+      "Survival Month",
+      "Recurrence",
+      "Others",
+      "TNM stage (T)",
+      "TNM stage (N)",
+      "TNM stage (M)"]
+clinical_info.drop(columns=rm, inplace=True)
 
-
-# # Remove columns
-# rm = ["Race",
-#       "Recurrence",
-#       "Others",
-#       "TNM stage (T)",
-#       "TNM stage (N)",
-#       "TNM stage (M)"]
 
 
 # =============================================================================
@@ -221,13 +228,15 @@ create_directory(figpath)
 
 # Plot age distributions
 # ----------------------
+## TODO: INCLUDE DISTRIBUTION OF MISSING VALUES. CONSIDER DIFFERENT 'STYLES'
+# ACROSS POSSIBLE CONFOUNDERS
 hues = ["Dataset", "Disease Status", "Gender", "Histology"]
 
 for x, hue in [("Age", hue) for hue in hues]:
     title = x+" by "+hue.lower()
     
     fig, ax = plt.subplots(figsize=(8,8))
-    sns.kdeplot(data=df, x=x, hue=hue, ax=ax)
+    sns.kdeplot(data=clinical_info, x=x, hue=hue, ax=ax)
     # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
     ax.set_title(title)
     fig.tight_layout()
@@ -238,8 +247,8 @@ for x, hue in [("Age", hue) for hue in hues]:
     
 
 # "Optimistic" vs. "Pessimistic" estimates
-subhues = ["Stage", "Smoking"]
-for x, hue in [("Age", hue) for hue in subhues]:
+hues = ["Stage", "Smoking"]
+for x, hue in [("Age", hue) for hue in hues]:
     fig, ax = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(12,8))
     title = x+" by "+hue.lower()
     fig.suptitle(title)
@@ -247,7 +256,7 @@ for x, hue in [("Age", hue) for hue in subhues]:
         title = x+" by "+hue.lower()+" ("+est+")"
         subhue = hue+"_"+est.lower()[0:3]
         
-        sns.kdeplot(data=df, x=x, hue=subhue, ax=ax[i])
+        sns.kdeplot(data=clinical_info, x=x, hue=subhue, ax=ax[i])
         # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
         ax[i].set_title(est)
         fig.tight_layout()
@@ -255,3 +264,84 @@ for x, hue in [("Age", hue) for hue in subhues]:
         name = x+" by "+subhue
         path = os.path.join(figpath, name.lower().replace(" ", "_")+".png")
         fig.savefig(path, bbox_inches="tight")
+        
+     
+# Recreate plots from literature
+# ------------------------------
+# PCA plots (Batch uncorrected vs. corrected)
+n_components=3
+
+pca_nocombat = PCA(n_components=n_components)
+pca_nocombat.fit(nocombat_nofilter_expr)
+X_pc_nocombat = pca_nocombat.transform(nocombat_nofilter_expr)
+X_pc_nocombat = pd.DataFrame(
+    X_pc_nocombat, index=nocombat_nofilter_expr.index,
+    columns=["PC"+str(i+1) for i in range(n_components)])
+X_pc_nocombat = pd.merge(clinical_info, X_pc_nocombat, how="inner",
+                         left_index=True, right_index=True)
+
+pca_combat = PCA(n_components=n_components)
+pca_combat.fit(combat_nofilter_expr)
+X_pc_combat = pca_combat.transform(combat_nofilter_expr)
+X_pc_combat = pd.DataFrame(
+    X_pc_combat, index=combat_nofilter_expr.index,
+    columns=["PC"+str(i+1) for i in range(n_components)])
+X_pc_combat = pd.merge(clinical_info, X_pc_combat, how="inner",
+                       left_index=True, right_index=True)
+
+
+# By dataset
+hues = sorted(set(clinical_info["Dataset"]))
+colors = ["cyan", "brown", "magenta", "yellow", "orange",
+          "lime", "blue", "black", "red", "lightgray"]
+kwargs = {"hue_order":hues,
+          "palette":{h:c for h, c in zip(hues, colors)}}
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 7))
+sns.scatterplot(x="PC1", y="PC2", data=X_pc_nocombat, hue="Dataset",
+                style="Dataset", legend=False, ax=axes[0], **kwargs)
+axes[0].set_title("Batch-effect uncorrected")
+axes[0].set(xlabel=None, ylabel=None)
+axes[0].invert_xaxis()
+
+sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Dataset",
+                style="Dataset", ax=axes[1], **kwargs)
+axes[1].set_title("Batch-effect corrected")
+axes[1].set(xlabel=None, ylabel=None)
+axes[1].invert_yaxis()
+axes[1].legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
+               borderaxespad=0., title="Dataset")
+
+fig.savefig(os.path.join(figpath, "pca_by_dataset.png"), bbox_inches="tight")
+
+
+# By disease status
+hues = sorted(set(clinical_info["Disease Status"]))
+colors = ["lime", "red"]
+kwargs = {"hue_order":hues,
+          "palette":{h:c for h, c in zip(hues, colors)}}
+
+fig, ax = plt.subplots(figsize=(7, 7))
+sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Disease Status",
+                ax=ax, **kwargs)
+ax.set_title("Batch-effect corrected")
+ax.set(xlabel=None, ylabel=None)
+ax.invert_yaxis()
+ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
+          borderaxespad=0., title="Status")
+
+fig.savefig(os.path.join(figpath, "pca_by_status.png"), bbox_inches="tight")
+
+
+# Plot correlation
+# ----------------
+# ci_expr = pd.merge(clinical_info, combat_filter_expr,
+#                    how="inner", left_index=True, right_index=True)
+# corr = ci_expr.corr()
+
+# 'corr' method takes very long. Consider this in R or build faster version
+# (e.g. parallelise code, distributed computing with Dask/Ray)
+
+
+## TODO: PLOT CORRELATION WITH SNS.CLUSTERMAP AND COLOR BY HISTOLOGY/STATUS
+## TODO: CONSIDER CHI-SQUARED TO ANALYSE CATEGORICAL FEATURES
