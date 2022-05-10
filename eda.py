@@ -203,6 +203,10 @@ clinical_info["Smoking_pes"] = clinical_info["Smoking"].apply(
 # Pessimistic recoding of "Smoking" (non-smoking --> former)
 
 # Recode "Histology"
+clinical_info.loc[(clinical_info["Disease Status"]=="Non-tumour")
+    & (clinical_info["Histology"].isnull()), "Histology"] = "Healthy"            
+# Disease subtype for healthy patients should be "Healthy"
+
 clinical_info["Histology"] = clinical_info["Histology"].map(HISTOLOGY_MAP)
 
 # Remove columns
@@ -338,15 +342,31 @@ ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
 fig.savefig(os.path.join(figpath, "pca_by_status.png"), bbox_inches="tight")
 
 
-# Plot correlation
-# ----------------
-# ci_expr = pd.merge(clinical_info, combat_filter_expr,
-#                    how="inner", left_index=True, right_index=True)
-# corr = ci_expr.corr()
+# Additional exploratory plots
+# ----------------------------
+hues = ["ADC", "ASC", "LCC", "LCNEC", "NFA",
+        "SCC", "Mixed", "Healthy", "Other", "Missing"]
+colors = ["blue", "fuchsia", "yellow", "orange", "cyan",
+          "red", "blueviolet", "lime", "black", "lightgray"]
+kwargs = {"hue_order":hues,
+          "palette":{h:c for h, c in zip(hues, colors)}}
 
-# 'corr' method takes very long. Consider this in R or build faster version
-# (e.g. parallelise code, distributed computing with Dask/Ray)
+fig, ax = plt.subplots(figsize=(7, 7))
+sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Histology",
+                ax=ax, **kwargs)
+ax.set_title("Batch-effect corrected")
+ax.set(xlabel=None, ylabel=None)
+ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
+          borderaxespad=0., title="Histology")
+
+fig.savefig(os.path.join(figpath, "pca_by_histology.png"), bbox_inches="tight")
 
 
-## TODO: PLOT CORRELATION WITH SNS.CLUSTERMAP AND COLOR BY HISTOLOGY/STATUS
-## TODO: CONSIDER CHI-SQUARED TO ANALYSE CATEGORICAL FEATURES
+# # Plot correlation
+# # ----------------
+# ## TODO: PLOT CORRELATION WITH SNS.CLUSTERMAP AND COLOR BY HISTOLOGY/STATUS
+# corr = combat_filter_expr.corr()
+# # WARNING: Takes around 20 mins
+
+# test = corr.iloc[0:200, 0:200]
+# sns.clustermap(test, cmap="vlag", vmin=-1, vmax=1, figsize=(14,14))

@@ -6,9 +6,10 @@ from .utils import (ROOT,
                     HISTOLOGY_MAP,
                     STAGE_MAP,
                     SMOKING_MAP,
-                    SAMPLE_IDS)
+                    TRAIN_TEST_SPLIT)
 
-from .utils import create_directory
+from .utils import (create_directory,
+                    load_clinical_info)
 
 
 
