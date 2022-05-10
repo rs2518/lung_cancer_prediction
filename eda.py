@@ -12,8 +12,7 @@ from lcml import (CLINICAL_INFO_COLS,
                   STATUS_MAP,
                   HISTOLOGY_MAP,
                   STAGE_MAP,
-                  SMOKING_MAP,
-                  SAMPLE_IDS)
+                  SMOKING_MAP)
 from lcml import create_directory
 
 
@@ -96,16 +95,16 @@ clinical_info_url = "https://figshare.com/ndownloader/files/10449075"
 
 
 
-# Load data
-# ---------
-patient_status = pd.read_csv(patient_status_url, index_col=0)
-combat_filter_expr = pd.read_csv(combat_filter_expr_url, sep="\t").T
+# # Load data
+# # ---------
+# patient_status = pd.read_csv(patient_status_url, index_col=0)
+# combat_filter_expr = pd.read_csv(combat_filter_expr_url, sep="\t").T
 combat_nofilter_expr = pd.read_csv(combat_nofilter_expr_url, sep="\t").T
 nocombat_nofilter_expr = pd.read_csv(nocombat_nofilter_expr_url, sep="\t").T
-microarray_logfc = pd.read_csv(microarray_logfc_url, sep="\t")
-tcga_logfc = pd.read_csv(tcga_logfc_url, sep="\t")
-tcga_expr = pd.read_csv(tcga_expr_url, sep="\t", index_col=0).T
-combined_rank = pd.read_csv(combined_rank_url, sep="\t")
+# microarray_logfc = pd.read_csv(microarray_logfc_url, sep="\t")
+# tcga_logfc = pd.read_csv(tcga_logfc_url, sep="\t")
+# tcga_expr = pd.read_csv(tcga_expr_url, sep="\t", index_col=0).T
+# combined_rank = pd.read_csv(combined_rank_url, sep="\t")
 clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
                             header=0, names=CLINICAL_INFO_COLS)
 
@@ -115,16 +114,16 @@ clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
 # SANITY CHECKS
 # =============================================================================
 
-# Check clinical_info and patient_status records match
-merge = pd.merge(patient_status, clinical_info,
-                  how="inner", left_index=True, right_index=True)    
-if clinical_info.shape[0] != merge.shape[0]:
-    raise ValueError("Clinical information and patient status "
-                      "records do not match!")
+# # Check clinical_info and patient_status records match
+# merge = pd.merge(patient_status, clinical_info,
+#                   how="inner", left_index=True, right_index=True)    
+# if clinical_info.shape[0] != merge.shape[0]:
+#     raise ValueError("Clinical information and patient status "
+#                       "records do not match!")
 
-# Check "Gene" and "Gene.1" columns match in rank table
-if all(combined_rank["Gene"]!=combined_rank["Gene.1"]):
-    raise ValueError("'Gene' does not match 'Gene.1' in rank table!")
+# # Check "Gene" and "Gene.1" columns match in rank table
+# if all(combined_rank["Gene"]!=combined_rank["Gene.1"]):
+#     raise ValueError("'Gene' does not match 'Gene.1' in rank table!")
     
 
 
@@ -132,36 +131,36 @@ if all(combined_rank["Gene"]!=combined_rank["Gene.1"]):
 # EXAMINE DATA
 # =============================================================================
 
-# Missing data
-# ------------
-sort="descending"
-na_patient_status = missing_data_prop(patient_status, sort=sort)
-na_combat_filter = missing_data_prop(combat_filter_expr, sort=sort)
-na_combat_nofilter = missing_data_prop(combat_nofilter_expr, sort=sort)
-na_nocombat_nofilter = missing_data_prop(nocombat_nofilter_expr, sort=sort)
-na_microarray_logfc = missing_data_prop(microarray_logfc, sort=sort)
-na_tcga_logfc = missing_data_prop(tcga_logfc, sort=sort)
-na_tcga_expr = missing_data_prop(tcga_expr, sort=sort)
-na_combined_rank = missing_data_prop(combined_rank, sort=sort)
-na_clinical_info = missing_data_prop(clinical_info)
-# NOTE: Only clinical information contains missing values
+# # Missing data
+# # ------------
+# sort="descending"
+# na_patient_status = missing_data_prop(patient_status, sort=sort)
+# na_combat_filter = missing_data_prop(combat_filter_expr, sort=sort)
+# na_combat_nofilter = missing_data_prop(combat_nofilter_expr, sort=sort)
+# na_nocombat_nofilter = missing_data_prop(nocombat_nofilter_expr, sort=sort)
+# na_microarray_logfc = missing_data_prop(microarray_logfc, sort=sort)
+# na_tcga_logfc = missing_data_prop(tcga_logfc, sort=sort)
+# na_tcga_expr = missing_data_prop(tcga_expr, sort=sort)
+# na_combined_rank = missing_data_prop(combined_rank, sort=sort)
+# na_clinical_info = missing_data_prop(clinical_info)
+# # NOTE: Only clinical information contains missing values
 
-# Counts by dataset
-dataset_counts = group_counts(clinical_info, col="Dataset",
-                              return_counts=True)
-status_counts = group_counts(clinical_info, col="Disease Status",
-                             return_counts=True)
-histology_counts = group_counts(clinical_info, col="Histology",
-                                return_counts=True)
-gender_counts = group_counts(clinical_info, col="Gender",
-                             return_counts=True)
-stage_counts = group_counts(clinical_info, col="Stage",
-                            return_counts=True)
-surv_counts = group_counts(clinical_info, col="Survival",
-                           return_counts=True)
-smoking_count = group_counts(clinical_info, col="Smoking",
-                             return_counts=True)
-# NOTE: Most missing clinical data is based on the study they were taken from
+# # Counts by dataset
+# dataset_counts = group_counts(clinical_info, col="Dataset",
+#                               return_counts=True)
+# status_counts = group_counts(clinical_info, col="Disease Status",
+#                              return_counts=True)
+# histology_counts = group_counts(clinical_info, col="Histology",
+#                                 return_counts=True)
+# gender_counts = group_counts(clinical_info, col="Gender",
+#                              return_counts=True)
+# stage_counts = group_counts(clinical_info, col="Stage",
+#                             return_counts=True)
+# surv_counts = group_counts(clinical_info, col="Survival",
+#                            return_counts=True)
+# smoking_count = group_counts(clinical_info, col="Smoking",
+#                              return_counts=True)
+# # NOTE: Most missing clinical data is based on the study they were taken from
 
 
 # # Checking feature values
@@ -228,8 +227,9 @@ create_directory(figpath)
 
 # Plot age distributions
 # ----------------------
-## TODO: INCLUDE DISTRIBUTION OF MISSING VALUES. CONSIDER DIFFERENT 'STYLES'
-# ACROSS POSSIBLE CONFOUNDERS
+## TODO: CONSIDER DIFFERENT 'STYLES' ACROSS POSSIBLE CONFOUNDERS.
+# ADD ANNOTATIONS (MEDIAN BY HUE)
+## TODO: REORDER HUES AND SELECT COLOURS
 hues = ["Dataset", "Disease Status", "Gender", "Histology"]
 
 for x, hue in [("Age", hue) for hue in hues]:
@@ -264,6 +264,10 @@ for x, hue in [("Age", hue) for hue in hues]:
         name = x+" by "+subhue
         path = os.path.join(figpath, name.lower().replace(" ", "_")+".png")
         fig.savefig(path, bbox_inches="tight")
+
+
+## TODO: CREATE CONTINGENCY TABLES (PD.CROSSTAB)
+## TODO: CONSIDER CHI-SQUARED TO ANALYSE CATEGORICAL FEATURES
         
      
 # Recreate plots from literature
@@ -289,6 +293,10 @@ X_pc_combat = pd.DataFrame(
 X_pc_combat = pd.merge(clinical_info, X_pc_combat, how="inner",
                        left_index=True, right_index=True)
 
+# Flip signs to be consistent with literature
+X_pc_nocombat["PC1"] = -X_pc_nocombat["PC1"]
+X_pc_combat["PC2"] = -X_pc_combat["PC2"]
+
 
 # By dataset
 hues = sorted(set(clinical_info["Dataset"]))
@@ -302,13 +310,11 @@ sns.scatterplot(x="PC1", y="PC2", data=X_pc_nocombat, hue="Dataset",
                 style="Dataset", legend=False, ax=axes[0], **kwargs)
 axes[0].set_title("Batch-effect uncorrected")
 axes[0].set(xlabel=None, ylabel=None)
-axes[0].invert_xaxis()
 
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Dataset",
                 style="Dataset", ax=axes[1], **kwargs)
 axes[1].set_title("Batch-effect corrected")
 axes[1].set(xlabel=None, ylabel=None)
-axes[1].invert_yaxis()
 axes[1].legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
                borderaxespad=0., title="Dataset")
 
@@ -326,7 +332,6 @@ sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Disease Status",
                 ax=ax, **kwargs)
 ax.set_title("Batch-effect corrected")
 ax.set(xlabel=None, ylabel=None)
-ax.invert_yaxis()
 ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
           borderaxespad=0., title="Status")
 
