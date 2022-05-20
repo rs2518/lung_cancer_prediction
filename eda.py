@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.decomposition import PCA
+from sklearn.utils import check_random_state
 
 from lcml import ROOT
 from lcml import (CLINICAL_INFO_COLS,
@@ -98,13 +99,13 @@ clinical_info_url = "https://figshare.com/ndownloader/files/10449075"
 # # Load data
 # # ---------
 # patient_status = pd.read_csv(patient_status_url, index_col=0)
-# combat_filter_expr = pd.read_csv(combat_filter_expr_url, sep="\t").T
+combat_filter_expr = pd.read_csv(combat_filter_expr_url, sep="\t").T
 combat_nofilter_expr = pd.read_csv(combat_nofilter_expr_url, sep="\t").T
 nocombat_nofilter_expr = pd.read_csv(nocombat_nofilter_expr_url, sep="\t").T
-# microarray_logfc = pd.read_csv(microarray_logfc_url, sep="\t")
+microarray_logfc = pd.read_csv(microarray_logfc_url, sep="\t")
 # tcga_logfc = pd.read_csv(tcga_logfc_url, sep="\t")
 # tcga_expr = pd.read_csv(tcga_expr_url, sep="\t", index_col=0).T
-# combined_rank = pd.read_csv(combined_rank_url, sep="\t")
+combined_rank = pd.read_csv(combined_rank_url, sep="\t")
 clinical_info = pd.read_csv(clinical_info_url, sep="\t", index_col=0,
                             header=0, names=CLINICAL_INFO_COLS)
 
@@ -379,11 +380,58 @@ fig.savefig(os.path.join(figpath, "2d_pca_by_histology.png"),
             bbox_inches="tight")
 
 
-# # Plot correlation
-# # ----------------
-# ## TODO: PLOT CORRELATION WITH SNS.CLUSTERMAP AND COLOR BY HISTOLOGY/STATUS
-# corr = combat_filter_expr.corr()
-# # WARNING: Takes around 20 mins
+# Plot expression levels
+# ----------------------
+rs = check_random_state(1010)
+s = sorted(rs.randint(0, combat_filter_expr.shape[1]-1, 9))
+combat_filter_expr.iloc[:, s].hist(figsize=(10,10), density=True)
+plt.suptitle("Batch corrected expression levels", fontsize=16)
 
-# test = corr.iloc[0:200, 0:200]
-# sns.clustermap(test, cmap="vlag", vmin=-1, vmax=1, figsize=(14,14))
+np.log(combat_filter_expr.iloc[:, s]).hist(figsize=(10,10), density=True)
+plt.suptitle("Batch corrected log-transformed expression levels", fontsize=16)
+# NOTE: Expression levels appear more normally distributed after
+# log transformation
+
+
+# Plot correlation
+# ----------------
+# Plot clustermaps for differentially expressed genes
+genes = sorted(microarray_logfc[microarray_logfc["threshold"]!=False].index)
+if any([g not in combat_filter_expr.columns.to_list() for g in genes]):
+    raise ValueError("Not all differentially expressed genes appear "
+                     "in filtered gene list!")
+
+df_expr = combat_filter_expr.loc[:, genes]
+corr = df_expr.corr()
+# WARNING: Correlation matrix for all genes takes around 20 mins
+
+# Gene-gene correlation
+fig = sns.clustermap(corr, cmap="vlag", vmin=-1, vmax=1, figsize=(14,14))
+fig.savefig(os.path.join(figpath, "gene_correlation.png"), bbox_inches="tight")
+# NOTE: Strong correlation and block structure among most significant genes
+# Irrepresentable condition isn't valid (penalisation should work)
+
+
+# Clustered observations by "Disease Status"
+tumour = clinical_info.loc[df_expr.index, "Disease Status"]
+cmap = dict(zip(sorted(set(tumour)), ["lime", "red"]))
+fig = sns.clustermap(df_expr, figsize=(14,14), cmap="Spectral",
+                     row_colors=tumour.map(cmap))
+fig.savefig(os.path.join(figpath, "status_clustermap.png"),
+            bbox_inches="tight")
+
+
+# Clustered observations by "Histology"
+histology = clinical_info.loc[df_expr.index, "Histology"]
+colors = ["blue", "fuchsia", "lime", "yellow", "orange",
+          "lightgray", "blueviolet", "cyan", "black", "red"]
+cmap = dict(zip(sorted(set(histology)), colors))
+
+fig = sns.clustermap(df_expr, figsize=(14,14), cmap="Spectral",
+                     row_colors=histology.map(cmap))
+fig.savefig(os.path.join(figpath, "histology__clustermap.png"),
+            bbox_inches="tight")
+
+## TODO: REPEAT CORRELATION PLOTS ON LOG TRANSFORMED VALUES AND COMPARE
+# NOTE THAT CLUSTERMAPS CANNOT BE VIEWED SIDE-BY-SIDE IN SUBPLOTS
+## TODO: CONSIDER ADDING COLUMN COLOUR (UPREGULATED VS DOWNREGULATED GENES)
