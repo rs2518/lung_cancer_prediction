@@ -380,6 +380,58 @@ fig.savefig(os.path.join(figpath, "2d_pca_by_histology.png"),
             bbox_inches="tight")
 
 
+# 3D PCA plot by disease status
+hues = sorted(set(clinical_info["Disease Status"]))
+colors = ["lime", "red"]
+
+fig = plt.figure(figsize=(7, 7))
+ax = fig.add_subplot(projection="3d")
+for hue, c in zip(hues, colors):
+    x = X_pc_combat["PC1"][X_pc_combat["Disease Status"]==hue]
+    y = X_pc_combat["PC2"][X_pc_combat["Disease Status"]==hue]
+    z = X_pc_combat["PC3"][X_pc_combat["Disease Status"]==hue]
+    ax.scatter(x, y, z, c=c)
+    ax.view_init(elev=40, azim=60)
+    # for angle in range(0, 360):
+    #     ax.view_init(30, angle)
+    #     plt.draw()
+    #     plt.pause(.001)    
+ax.set_xlabel("PC1")
+ax.set_ylabel("PC2")
+ax.set_zlabel("PC3")
+
+fig.savefig(os.path.join(figpath, "3d_pca_by_status.png"),
+            bbox_inches="tight")
+# Best angle around 60 and 120
+
+
+# 3D PCA plot by dataset
+hues = sorted(set(clinical_info["Dataset"]))
+colors = ["cyan", "brown", "magenta", "yellow", "orange",
+          "lime", "blue", "black", "red", "lightgray"]
+
+fig = plt.figure(figsize=(7, 7))
+ax = fig.add_subplot(projection="3d")
+for hue, c in zip(hues, colors):
+    x = X_pc_nocombat["PC1"][X_pc_combat["Dataset"]==hue]
+    y = X_pc_nocombat["PC2"][X_pc_combat["Dataset"]==hue]
+    z = X_pc_nocombat["PC3"][X_pc_combat["Dataset"]==hue]
+    ax.scatter(x, y, z, c=c)
+    ax.view_init(elev=40, azim=300)
+    # for angle in range(0, 360):
+    #     ax.view_init(30, angle)
+    #     plt.draw()
+    #     plt.pause(.001)
+ax.set_xlabel("PC1")
+ax.set_ylabel("PC2")
+ax.set_zlabel("PC3")
+
+fig.savefig(os.path.join(figpath, "3d_pca_by_dataset.png"),
+            bbox_inches="tight")
+## TODO: CREATE SUBPLOTS TO COMPARE CORRECTED VS. UNCORRECTED
+## TODO: MAKE PLOT ROTATE
+
+
 # Plot expression levels
 # ----------------------
 rs = check_random_state(1010)
