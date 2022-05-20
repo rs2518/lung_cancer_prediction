@@ -188,11 +188,19 @@ clinical_info["Disease Status"] = clinical_info["Disease Status"].map(
 
 # Recode "Stage"
 clinical_info["Stage_opt"] = clinical_info["Stage"].apply(
-    lambda x: "1B" if x==" pT2N0" else STAGE_MAP[x])
-# Optimistic recoding of "Stage" (pT2N0 --> 1B)
+    lambda x: 1 if x==" pT2N0" else STAGE_MAP[x])
+# Optimistic recoding of "Stage" (pT2N0 --> 1)
 clinical_info["Stage_pes"] = clinical_info["Stage"].apply(
-    lambda x: "2A" if x==" pT2N0" else STAGE_MAP[x])
-# Pessimistic recoding of "Stage" (pT2N0 --> 2A)
+    lambda x: 2 if x==" pT2N0" else STAGE_MAP[x])
+# Pessimistic recoding of "Stage" (pT2N0 --> 2)
+
+# # Recode "Stage"
+# clinical_info["Stage_opt"] = clinical_info["Stage"].apply(
+#     lambda x: "1B" if x==" pT2N0" else STAGE_MAP[x])
+# # Optimistic recoding of "Stage" (pT2N0 --> 1B)
+# clinical_info["Stage_pes"] = clinical_info["Stage"].apply(
+#     lambda x: "2A" if x==" pT2N0" else STAGE_MAP[x])
+# # Pessimistic recoding of "Stage" (pT2N0 --> 2A)
 
 # Recode "Smoking"
 clinical_info["Smoking_opt"] = clinical_info["Smoking"].apply(
@@ -219,6 +227,10 @@ rm = ["Race",
       "TNM stage (M)"]
 clinical_info.drop(columns=rm, inplace=True)
 
+# Replace NAs for plots
+cols = ["Stage_opt", "Stage_pes", "Smoking_opt", "Smoking_pes", "Histology"]
+clinical_info.loc[:, cols] = clinical_info.loc[:, cols].fillna("Missing")
+
 
 
 # =============================================================================
@@ -233,14 +245,15 @@ create_directory(figpath)
 # ----------------------
 ## TODO: CONSIDER DIFFERENT 'STYLES' ACROSS POSSIBLE CONFOUNDERS.
 # ADD ANNOTATIONS (MEDIAN BY HUE)
-## TODO: REORDER HUES AND SELECT COLOURS
+## TODO: SET COLORMAP FOR CATEGORIES
 hues = ["Dataset", "Disease Status", "Gender", "Histology"]
 
 for x, hue in [("Age", hue) for hue in hues]:
     title = x+" by "+hue.lower()
     
     fig, ax = plt.subplots(figsize=(8,8))
-    sns.kdeplot(data=clinical_info, x=x, hue=hue, ax=ax)
+    sns.kdeplot(data=clinical_info, x=x, hue=hue,
+                ax=ax, warn_singular=False)
     # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
     ax.set_title(title)
     fig.tight_layout()
@@ -260,7 +273,8 @@ for x, hue in [("Age", hue) for hue in hues]:
         title = x+" by "+hue.lower()+" ("+est+")"
         subhue = hue+"_"+est.lower()[0:3]
         
-        sns.kdeplot(data=clinical_info, x=x, hue=subhue, ax=ax[i])
+        sns.kdeplot(data=clinical_info, x=x, hue=subhue,
+                    ax=ax[i], warn_singular=False)
         # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
         ax[i].set_title(est)
         fig.tight_layout()
@@ -268,7 +282,6 @@ for x, hue in [("Age", hue) for hue in hues]:
         name = x+" by "+subhue
         path = os.path.join(figpath, name.lower().replace(" ", "_")+".png")
         fig.savefig(path, bbox_inches="tight")
-
 
 ## TODO: CREATE CONTINGENCY TABLES (PD.CROSSTAB)
 ## TODO: CONSIDER CHI-SQUARED TO ANALYSE CATEGORICAL FEATURES
@@ -307,7 +320,7 @@ hues = sorted(set(clinical_info["Dataset"]))
 colors = ["cyan", "brown", "magenta", "yellow", "orange",
           "lime", "blue", "black", "red", "lightgray"]
 kwargs = {"hue_order":hues,
-          "palette":{h:c for h, c in zip(hues, colors)}}
+          "palette":dict(zip(hues, colors))}
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 7))
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_nocombat, hue="Dataset",
@@ -322,14 +335,15 @@ axes[1].set(xlabel=None, ylabel=None)
 axes[1].legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
                borderaxespad=0., title="Dataset")
 
-fig.savefig(os.path.join(figpath, "pca_by_dataset.png"), bbox_inches="tight")
+fig.savefig(os.path.join(figpath, "2d_pca_by_dataset.png"),
+            bbox_inches="tight")
 
 
 # By disease status
 hues = sorted(set(clinical_info["Disease Status"]))
 colors = ["lime", "red"]
 kwargs = {"hue_order":hues,
-          "palette":{h:c for h, c in zip(hues, colors)}}
+          "palette":dict(zip(hues, colors))}
 
 fig, ax = plt.subplots(figsize=(7, 7))
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Disease Status",
@@ -339,17 +353,19 @@ ax.set(xlabel=None, ylabel=None)
 ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
           borderaxespad=0., title="Status")
 
-fig.savefig(os.path.join(figpath, "pca_by_status.png"), bbox_inches="tight")
+fig.savefig(os.path.join(figpath, "2d_pca_by_status.png"),
+            bbox_inches="tight")
 
 
 # Additional exploratory plots
 # ----------------------------
+# PCA by Histology
 hues = ["ADC", "ASC", "LCC", "LCNEC", "NFA",
         "SCC", "Mixed", "Healthy", "Other", "Missing"]
 colors = ["blue", "fuchsia", "yellow", "orange", "cyan",
           "red", "blueviolet", "lime", "black", "lightgray"]
 kwargs = {"hue_order":hues,
-          "palette":{h:c for h, c in zip(hues, colors)}}
+          "palette":dict(zip(hues, colors))}
 
 fig, ax = plt.subplots(figsize=(7, 7))
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Histology",
@@ -359,7 +375,8 @@ ax.set(xlabel=None, ylabel=None)
 ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
           borderaxespad=0., title="Histology")
 
-fig.savefig(os.path.join(figpath, "pca_by_histology.png"), bbox_inches="tight")
+fig.savefig(os.path.join(figpath, "2d_pca_by_histology.png"),
+            bbox_inches="tight")
 
 
 # # Plot correlation
