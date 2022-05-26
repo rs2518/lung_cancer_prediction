@@ -15,7 +15,12 @@ from .utils import (ROOT,
                     STAGE_PALETTE)
 
 from .utils import (create_directory,
-                    load_clinical_info)
+                    load_clinical_info,
+                    load_patient_status,
+                    load_expression_data,
+                    load_de_analysis,
+                    load_de_rank,
+                    get_de_genes)
 
 
 
