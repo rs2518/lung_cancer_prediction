@@ -13,7 +13,13 @@ from lcml import (CLINICAL_INFO_COLS,
                   STATUS_MAP,
                   HISTOLOGY_MAP,
                   STAGE_MAP,
-                  SMOKING_MAP)
+                  SMOKING_MAP,
+                  DATASET_PALETTE,
+                  STATUS_PALETTE,
+                  GENDER_PALETTE,
+                  HISTOLOGY_PALETTE,
+                  SMOKING_PALETTE,
+                  STAGE_PALETTE)
 from lcml import create_directory
 
 
@@ -232,6 +238,8 @@ clinical_info.drop(columns=rm, inplace=True)
 cols = ["Stage_opt", "Stage_pes", "Smoking_opt", "Smoking_pes", "Histology"]
 clinical_info.loc[:, cols] = clinical_info.loc[:, cols].fillna("Missing")
 
+## TODO: RECODE MISSING STAGE FOR HEALTHY PATIENTS (-1 OR 0)
+
 
 
 # =============================================================================
@@ -246,18 +254,19 @@ create_directory(figpath)
 # ----------------------
 ## TODO: CONSIDER DIFFERENT 'STYLES' ACROSS POSSIBLE CONFOUNDERS.
 # ADD ANNOTATIONS (MEDIAN BY HUE)
-## TODO: SET COLORMAP FOR CATEGORIES
-hues = ["Dataset", "Disease Status", "Gender", "Histology"]
+cmaps = zip(
+    ["Dataset", "Disease Status", "Gender", "Histology"],
+    [DATASET_PALETTE, STATUS_PALETTE, GENDER_PALETTE, HISTOLOGY_PALETTE])
 
-for x, hue in [("Age", hue) for hue in hues]:
-    title = x+" by "+hue.lower()
+for hue, palette in cmaps:
+    title = "Age by "+hue.lower()
     
     fig, ax = plt.subplots(figsize=(8,8))
-    sns.kdeplot(data=clinical_info, x=x, hue=hue,
+    sns.kdeplot(data=clinical_info, x="Age", hue=hue, palette=palette,
                 ax=ax, warn_singular=False)
     # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
     ax.set_title(title)
-    fig.tight_layout()
+    # fig.tight_layout()
     
     name = title.lower().replace(" ", "_")
     path = os.path.join(figpath, name+".png")
@@ -265,26 +274,50 @@ for x, hue in [("Age", hue) for hue in hues]:
     
 
 # "Optimistic" vs. "Pessimistic" estimates
-hues = ["Stage", "Smoking"]
-for x, hue in [("Age", hue) for hue in hues]:
-    fig, ax = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(12,8))
-    title = x+" by "+hue.lower()
+cmaps = zip(["Stage", "Smoking"], [STAGE_PALETTE, SMOKING_PALETTE])
+for hue, palette in cmaps:
+    fig, axes = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(12,8))
+    title = "Age by "+hue.lower()
     fig.suptitle(title)
-    for i, est in enumerate(["Optimistic", "Pessimistic"]):
-        title = x+" by "+hue.lower()+" ("+est+")"
-        subhue = hue+"_"+est.lower()[0:3]
-        
-        sns.kdeplot(data=clinical_info, x=x, hue=subhue,
-                    ax=ax[i], warn_singular=False)
-        # fig.legend(bbox_to_anchor=(1.05, 0.5), borderaxespad=0)
-        ax[i].set_title(est)
-        fig.tight_layout()
     
-        name = x+" by "+subhue
-        path = os.path.join(figpath, name.lower().replace(" ", "_")+".png")
-        fig.savefig(path, bbox_inches="tight")
+    sns.kdeplot(data=clinical_info, x="Age", hue=hue+"_"+"opt",
+                palette=palette, legend=False, ax=axes[0],
+                warn_singular=False)
+    axes[0].set_title("Optimistic")
+    
+    if hue == "Smoking":
+        order = ["Never", "Former", "Current", "Missing"]
+    else:
+        order = None
+    sns.kdeplot(data=clinical_info, x="Age", hue=hue+"_"+"pes",
+                hue_order=order, palette=palette, ax=axes[1],
+                warn_singular=False)
+    axes[1].get_legend().set_title(hue) 
+    axes[1].set_title("Pessimistic")
+    plt.tight_layout()
+    
+    name = "Age by "+hue
+    path = os.path.join(figpath, name.lower().replace(" ", "_")+".png")
+    fig.savefig(path, bbox_inches="tight")
 
-## TODO: CREATE CONTINGENCY TABLES (PD.CROSSTAB)
+
+# Contingency tables
+# ------------------
+dataset_by_status = pd.crosstab(index=clinical_info["Dataset"],
+                                columns=[clinical_info["Disease Status"],
+                                         clinical_info["Gender"]])
+print(dataset_by_status)
+
+stage_by_status = pd.crosstab(index=clinical_info["Stage_opt"],
+                                columns=[clinical_info["Disease Status"],
+                                         clinical_info["Gender"]])
+print(stage_by_status)
+
+smoking_by_status = pd.crosstab(index=clinical_info["Smoking_opt"],
+                                columns=[clinical_info["Disease Status"],
+                                         clinical_info["Gender"]])
+print(smoking_by_status)
+
 ## TODO: CONSIDER CHI-SQUARED TO ANALYSE CATEGORICAL FEATURES
         
      
@@ -317,22 +350,27 @@ X_pc_combat["PC2"] = -X_pc_combat["PC2"]
 
 
 # By dataset
-hues = sorted(set(clinical_info["Dataset"]))
-colors = ["cyan", "brown", "magenta", "yellow", "orange",
-          "lime", "blue", "black", "red", "lightgray"]
-kwargs = {"hue_order":hues,
-          "palette":dict(zip(hues, colors))}
+kwargs = {"hue_order":list(DATASET_PALETTE.keys()),
+          "palette":DATASET_PALETTE}
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 7))
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_nocombat, hue="Dataset",
                 style="Dataset", legend=False, ax=axes[0], **kwargs)
 axes[0].set_title("Batch-effect uncorrected")
-axes[0].set(xlabel=None, ylabel=None)
+# axes[0].set(xlabel=None, ylabel=None)
+axes[0].set_xlabel(
+    "PC1 ({:.2f}%)".format(pca_nocombat.explained_variance_ratio_[0]))
+axes[0].set_ylabel(
+    "PC2 ({:.2f}%)".format(pca_nocombat.explained_variance_ratio_[1]))
 
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Dataset",
                 style="Dataset", ax=axes[1], **kwargs)
 axes[1].set_title("Batch-effect corrected")
-axes[1].set(xlabel=None, ylabel=None)
+# axes[1].set(xlabel=None, ylabel=None)
+axes[1].set_xlabel(
+    "PC1 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[0]))
+axes[1].set_ylabel(
+    "PC2 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[1]))
 axes[1].legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
                borderaxespad=0., title="Dataset")
 
@@ -341,16 +379,17 @@ fig.savefig(os.path.join(figpath, "2d_pca_by_dataset.png"),
 
 
 # By disease status
-hues = sorted(set(clinical_info["Disease Status"]))
-colors = ["lime", "red"]
-kwargs = {"hue_order":hues,
-          "palette":dict(zip(hues, colors))}
+kwargs = {"palette":STATUS_PALETTE}
 
 fig, ax = plt.subplots(figsize=(7, 7))
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Disease Status",
                 ax=ax, **kwargs)
 ax.set_title("Batch-effect corrected")
-ax.set(xlabel=None, ylabel=None)
+# ax.set(xlabel=None, ylabel=None)
+ax.set_xlabel(
+    "PC1 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[0]))
+ax.set_ylabel(
+    "PC2 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[1]))
 ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
           borderaxespad=0., title="Status")
 
@@ -361,18 +400,18 @@ fig.savefig(os.path.join(figpath, "2d_pca_by_status.png"),
 # Additional exploratory plots
 # ----------------------------
 # PCA by Histology
-hues = ["ADC", "ASC", "LCC", "LCNEC", "NFA",
-        "SCC", "Mixed", "Healthy", "Other", "Missing"]
-colors = ["blue", "fuchsia", "yellow", "orange", "cyan",
-          "red", "blueviolet", "lime", "black", "lightgray"]
-kwargs = {"hue_order":hues,
-          "palette":dict(zip(hues, colors))}
+kwargs = {"hue_order":list(HISTOLOGY_PALETTE.keys()),
+          "palette":HISTOLOGY_PALETTE}
 
 fig, ax = plt.subplots(figsize=(7, 7))
 sns.scatterplot(x="PC1", y="PC2", data=X_pc_combat, hue="Histology",
-                ax=ax, **kwargs)
+                style="Histology", ax=ax, **kwargs)
 ax.set_title("Batch-effect corrected")
-ax.set(xlabel=None, ylabel=None)
+# ax.set(xlabel=None, ylabel=None)
+ax.set_xlabel(
+    "PC1 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[0]))
+ax.set_ylabel(
+    "PC2 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[1]))
 ax.legend(bbox_to_anchor=(1.05, 0.5), loc="center left",
           borderaxespad=0., title="Histology")
 
@@ -381,12 +420,9 @@ fig.savefig(os.path.join(figpath, "2d_pca_by_histology.png"),
 
 
 # 3D PCA plot by disease status
-hues = sorted(set(clinical_info["Disease Status"]))
-colors = ["lime", "red"]
-
 fig = plt.figure(figsize=(7, 7))
 ax = fig.add_subplot(projection="3d")
-for hue, c in zip(hues, colors):
+for hue, c in STATUS_PALETTE.items():
     x = X_pc_combat["PC1"][X_pc_combat["Disease Status"]==hue]
     y = X_pc_combat["PC2"][X_pc_combat["Disease Status"]==hue]
     z = X_pc_combat["PC3"][X_pc_combat["Disease Status"]==hue]
@@ -395,10 +431,14 @@ for hue, c in zip(hues, colors):
     # for angle in range(0, 360):
     #     ax.view_init(30, angle)
     #     plt.draw()
-    #     plt.pause(.001)    
-ax.set_xlabel("PC1")
-ax.set_ylabel("PC2")
-ax.set_zlabel("PC3")
+    #     plt.pause(.001)
+ax.set_title("Batch-effect corrected")
+ax.set_xlabel(
+    "PC1 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[0]))
+ax.set_ylabel(
+    "PC2 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[1]))
+ax.set_zlabel(
+    "PC3 ({:.2f}%)".format(pca_combat.explained_variance_ratio_[2]))
 
 fig.savefig(os.path.join(figpath, "3d_pca_by_status.png"),
             bbox_inches="tight")
@@ -406,13 +446,9 @@ fig.savefig(os.path.join(figpath, "3d_pca_by_status.png"),
 
 
 # 3D PCA plot by dataset
-hues = sorted(set(clinical_info["Dataset"]))
-colors = ["cyan", "brown", "magenta", "yellow", "orange",
-          "lime", "blue", "black", "red", "lightgray"]
-
 fig = plt.figure(figsize=(7, 7))
 ax = fig.add_subplot(projection="3d")
-for hue, c in zip(hues, colors):
+for hue, c in DATASET_PALETTE.items():
     x = X_pc_nocombat["PC1"][X_pc_combat["Dataset"]==hue]
     y = X_pc_nocombat["PC2"][X_pc_combat["Dataset"]==hue]
     z = X_pc_nocombat["PC3"][X_pc_combat["Dataset"]==hue]
@@ -422,9 +458,13 @@ for hue, c in zip(hues, colors):
     #     ax.view_init(30, angle)
     #     plt.draw()
     #     plt.pause(.001)
-ax.set_xlabel("PC1")
-ax.set_ylabel("PC2")
-ax.set_zlabel("PC3")
+ax.set_title("Batch-effect uncorrected")
+ax.set_xlabel(
+    "PC1 ({:.2f}%)".format(pca_nocombat.explained_variance_ratio_[0]))
+ax.set_ylabel(
+    "PC2 ({:.2f}%)".format(pca_nocombat.explained_variance_ratio_[1]))
+ax.set_zlabel(
+    "PC3 ({:.2f}%)".format(pca_nocombat.explained_variance_ratio_[2]))
 
 fig.savefig(os.path.join(figpath, "3d_pca_by_dataset.png"),
             bbox_inches="tight")

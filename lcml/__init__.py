@@ -6,7 +6,13 @@ from .utils import (ROOT,
                     HISTOLOGY_MAP,
                     STAGE_MAP,
                     SMOKING_MAP,
-                    TRAIN_TEST_SPLIT)
+                    TRAIN_TEST_SPLIT,
+                    DATASET_PALETTE,
+                    STATUS_PALETTE,
+                    GENDER_PALETTE,
+                    HISTOLOGY_PALETTE,
+                    SMOKING_PALETTE,
+                    STAGE_PALETTE)
 
 from .utils import (create_directory,
                     load_clinical_info)
