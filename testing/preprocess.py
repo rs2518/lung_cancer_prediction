@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
 
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import make_column_selector, ColumnTransformer
+from sklearn.model_selection import train_test_split
 
-
-from lcml import load_data
+from lcml import (TRAIN_TEST_PARAMS,
+                  load_data)
+from lcml.utils import feature_preprocessor
 
 ## ONLY USE AFTER THOROUGHLY CHECKING WARNINGS
 # import warnings
@@ -22,22 +22,17 @@ from lcml import load_data
 # ---------
 # Expression levels only, DE genes only
 df = load_data(label="Disease Status", expr_only=True, top_genes=True)
-df["Disease Status"] = df["Disease Status"].map({"Tumour":1, "Non-tumour":0})
+
+X = df.drop(columns="Disease Status")
+y = df["Disease Status"].map({"Tumour":1, "Non-tumour":0})
 
 
 # Preprocess features
 # -------------------
-X = df.drop(columns="Disease Status")
-Y = df["Disease Status"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, **TRAIN_TEST_PARAMS)
 
-categorical_columns = make_column_selector(dtype_include="category")(X)
-numerical_columns = make_column_selector(dtype_include=np.number)(X)
-oh = OneHotEncoder()
-sc = StandardScaler()
-preprocessor = ColumnTransformer([
-    ("one-hot-encoder", oh, categorical_columns),
-    ("standard_scaler", sc, numerical_columns)],
-    verbose_feature_names_out=False)
+preprocessor = feature_preprocessor(X)
+X_train = pd.DataFrame(preprocessor.fit_transform(X_train),
+                       columns=preprocessor.get_feature_names_out())
 
-X = preprocessor.fit_transform(X)
-X = pd.DataFrame(X, columns=preprocessor.get_feature_names_out())
+# preprocessor.named_transformers_["standard_scaler"].mean_
