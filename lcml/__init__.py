@@ -20,6 +20,7 @@ from .utils import (create_directory,
                     load_expression_data,
                     load_de_analysis,
                     load_de_rank,
+                    load_data,
                     get_de_genes)
 
 
