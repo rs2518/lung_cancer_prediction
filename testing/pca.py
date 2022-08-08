@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -7,8 +9,10 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 
 from lcml import ROOT
+from lcml import create_directory
 from lcml.utils import (load_clinical_info,
                         load_expression_data,
+                        load_data,
                         get_de_genes)
 
 
@@ -17,13 +21,19 @@ from lcml.utils import (load_clinical_info,
 # DIMENSION REDUCTION
 # =============================================================================
 
+figpath = os.path.join(ROOT, "figures", "pca")
+create_directory(figpath)
+
 # Load data
 # ---------
-clinical_info = load_clinical_info()
-expr = load_expression_data(source="microarray", corrected=True,
-                            filtered=True)
-X_full = expr.loc[clinical_info.index, :]
+# clinical_info = load_clinical_info()
+# expr = load_expression_data(source="microarray", corrected=True,
+#                             filtered=True)
+df = load_data(label="Disease Status", top_genes=False)
+X_full = df.iloc[:,:-1]
 X = X_full.loc[:, get_de_genes()]
+
+## TODO: PREPROCESS DATA BEFORE TRANSFORMATION
 
 # Transform data with PCA
 pca_full = PCA()
@@ -33,14 +43,14 @@ pca = PCA()
 X = pca.fit_transform(X)
 
 
-# Pie chart for explained variance (all genes vs. DE genes only)
+# Explained variance (all genes vs. DE genes only)
 # --------------------------------------------------------------
 total_variance_full = sum(pca_full.explained_variance_)
 total_variance = sum(pca.explained_variance_)
 proportions = [total_variance/total_variance_full,
                1 - total_variance/total_variance_full]
 labels = ["DE genes (p=%s)" % (X.shape[1]),
-          "Non-DE genes (p=%s)" % (expr.shape[1]-X.shape[1])]
+          "Non-DE genes (p=%s)" % (X_full.shape[1]-X.shape[1])]
 
 fig, ax = plt.subplots()
 ax.pie(proportions, labels=labels, autopct='%1.1f%%')
@@ -94,9 +104,24 @@ def scree_plot(explained_variance, n_components=None, max_variance=1.,
 fig1 = scree_plot(pca_full.explained_variance_ratio_, 
                   n_components=20,
                   title="Scree plot (all genes)")
+path = os.path.join(figpath, "pca_scree_all.png")
+fig1.savefig(path, bbox_inches="tight")
 
 fig2 = scree_plot(pca.explained_variance_ratio_,
                   n_components=20,
                   title="Scree plot (DE genes only)")
+path = os.path.join(figpath, "pca_scree_de_genes.png")
+fig2.savefig(path, bbox_inches="tight")
 
-## TODO: SAVE PLOTS
+
+
+# # NOTE: For 90% of total captured variability:
+# # Full data - 377 components; DE genes only - 34 components
+# thresh = 0.9
+# v_full = np.cumsum(pca_full.explained_variance_ratio_)
+# v = np.cumsum(pca.explained_variance_ratio_)
+
+# print("Number of components that capture %i%% of ALL genes: %i" %
+#       (100*thresh, len(v_full[v_full<=thresh])))
+# print("Number of components that capture %i%% of the DE genes: %i" %
+#       (100*thresh, len(v[v<=thresh])))
